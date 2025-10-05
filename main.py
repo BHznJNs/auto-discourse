@@ -14,6 +14,7 @@ load_dotenv()
 SITE_URL = "https://linux.do"
 CLIENT_NAME = "auto-discourse"
 CLIENT_ID = "Tv3eZYxfvYo3VU6reYX20ogXgbUHhYpG"
+SITE_REQUEST_INTERVAL = 30
 
 USER_INSTERESTS = os.environ.get("USER_INSTERESTS")
 USER_UNINSTERESTS = os.environ.get("USER_UNINSTERESTS")
@@ -93,9 +94,13 @@ def main() -> None:
             time.sleep(3)
             continue
         topics = latest_topics["topic_list"]["topics"]
+        start_time = time.monotonic()
         asyncio.run(
             check_topics(
                 list(filter(lambda topic: topic['title'] not in topic_cache, topics))))
+        end_time = time.monotonic()
+        sleep_time = max(0, SITE_REQUEST_INTERVAL - (end_time - start_time))
+        time.sleep(sleep_time)
 
 if __name__ == '__main__':
     main()
