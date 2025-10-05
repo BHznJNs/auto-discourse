@@ -17,6 +17,7 @@ cp .env.example .env
 - `OPENAI_BASE_URL`: OpenAI API 的基础 URL，可选，用于配置自定义的 API 端点
 - `MODEL_ID`: 使用的 AI 模型 ID，可选，默认为 `gpt-4`
 - `USER_INSTERESTS`: 用户感兴趣的关键字，用逗号分隔，用于判断话题是否感兴趣
+- `USER_UNINSTERESTS`: 用户不感兴趣的关键字，用逗号分隔，用于判断话题是否感兴趣
 - `CHECK_IN_BATCH`: 批量检查话题的数量，可选，默认为 `5`
 
 运行脚本：

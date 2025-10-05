@@ -16,11 +16,15 @@ CLIENT_NAME = "auto-discourse"
 CLIENT_ID = "Tv3eZYxfvYo3VU6reYX20ogXgbUHhYpG"
 
 USER_INSTERESTS = os.environ.get("USER_INSTERESTS")
+USER_UNINSTERESTS = os.environ.get("USER_UNINSTERESTS")
 
 SYSTEM_INSTRUCTION = f"""
-你是一个 AI 助手，你的任务是判断一个话题是否感兴趣。
-话题感兴趣的标准是：话题包含以下关键词：{USER_INSTERESTS}。
-请判断话题是否感兴趣，并回答`true`或`false`。
+你是一个 AI 助手，你的任务是判断一个话题用户是否可能感兴趣。
+你可以使用以下关键词来辅助判断：
+- 用户感兴趣的关键词：{USER_INSTERESTS}
+- 用户不感兴趣的关键词：{USER_UNINSTERESTS}
+
+请判断给定的话题用户是否感兴趣，并回答`true`或`false`。
 
 **注意：你的回答只能是`true`或`false`，不要输出其他内容，也不要有任何解释。**
 """
@@ -30,6 +34,7 @@ client = AsyncOpenAI(
     base_url=os.environ.get("OPENAI_BASE_URL"),
     default_headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"}
 )
+topic_cache = set()
 
 def print_topic(topic: Topic):
     print(f"""
@@ -49,7 +54,8 @@ async def check_is_insterested(topic: str) -> bool:
                     {"role": "user", "content": topic},
                 ]
             )
-            return completion.choices[0].message.content == "true"
+            if completion.choices[0].message.content is not None:
+                return completion.choices[0].message.content.strip() == "true"
         except: pass
         i += 1
     print(f"Failed to check interest for topic: {topic}")
@@ -65,6 +71,7 @@ async def check_topics(topics: list[Topic]):
         for _, (topic, is_insterested) in enumerate(zip(batch, results)):
             if is_insterested:
                 print_topic(topic)
+                topic_cache.add(topic['title'])
 
 def main() -> None:
     try:
@@ -85,7 +92,10 @@ def main() -> None:
         if latest_topics is None:
             time.sleep(3)
             continue
-        asyncio.run(check_topics(latest_topics["topic_list"]["topics"]))
+        topics = latest_topics["topic_list"]["topics"]
+        asyncio.run(
+            check_topics(
+                list(filter(lambda topic: topic['title'] not in topic_cache, topics))))
 
 if __name__ == '__main__':
     main()
