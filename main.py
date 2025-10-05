@@ -12,7 +12,7 @@ from utils import read_config
 load_dotenv()
 
 SITE_URL = "https://linux.do"
-CLIENT_NAME = "'auto-discourse'"
+CLIENT_NAME = "auto-discourse"
 CLIENT_ID = "Tv3eZYxfvYo3VU6reYX20ogXgbUHhYpG"
 
 USER_INSTERESTS = os.environ.get("USER_INSTERESTS")
