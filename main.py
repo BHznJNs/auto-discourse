@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 from dataclasses import asdict
 from openai import AsyncOpenAI
 from defs import Topic
-from discourse_operations import DEFAULT_SCOPES, fetch_latest, fetch_topic_content, generate_user_api_key
+from discourse_operations import DEFAULT_SCOPES, fetch_latest, generate_user_api_key
 from utils import read_config
 
 load_dotenv()
