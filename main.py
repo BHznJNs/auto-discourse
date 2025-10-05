@@ -15,7 +15,7 @@ SITE_URL = "https://linux.do"
 CLIENT_NAME = "auto-discourse"
 CLIENT_ID = "Tv3eZYxfvYo3VU6reYX20ogXgbUHhYpG"
 SITE_REQUEST_INTERVAL = 30
-VERBOSE = True
+VERBOSE = False
 
 USER_INSTERESTS = os.environ.get("USER_INSTERESTS")
 USER_UNINSTERESTS = os.environ.get("USER_UNINSTERESTS")
