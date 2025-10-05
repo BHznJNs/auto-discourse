@@ -3,11 +3,10 @@ import json
 import os
 import time
 from dotenv import load_dotenv
-from curl_cffi import requests
 from dataclasses import asdict
 from openai import AsyncOpenAI
-from defs import Topic, TopicsResponse
-from discourse_operations import DEFAULT_SCOPES, UserApiKeyPayload, generate_user_api_key
+from defs import Topic
+from discourse_operations import DEFAULT_SCOPES, fetch_latest, generate_user_api_key
 from utils import read_config
 
 load_dotenv()
@@ -67,22 +66,6 @@ async def check_topics(topics: list[Topic]):
             if is_insterested:
                 print_topic(topic)
 
-def fetch_new(payload: UserApiKeyPayload) -> TopicsResponse | None:
-    response = requests.get(
-        f"{SITE_URL}/new.json",
-        headers={
-            "User-Api-Key": payload.key,
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36",
-            "Referer": "https://www.google.com/",
-            "Accept-Language": "zh-CN,zh;q=0.9"
-        },
-    )
-    if response.status_code != 200:
-        print(f"Request failed with status code {response.status_code}")
-        return
-    new_topics = TopicsResponse(response.json())
-    return new_topics
-
 def main() -> None:
     try:
         user_api_key_payload = read_config()
@@ -96,13 +79,13 @@ def main() -> None:
         with open('config.json', 'w') as f:
             json.dump(asdict(result.payload), f)
         user_api_key_payload = result.payload
-    
+
     while True:
-        new_topics = fetch_new(user_api_key_payload)
-        if new_topics is None:
+        latest_topics = fetch_latest(SITE_URL, user_api_key_payload)
+        if latest_topics is None:
             time.sleep(3)
             continue
-        asyncio.run(check_topics(new_topics["topic_list"]["topics"]))
+        asyncio.run(check_topics(latest_topics["topic_list"]["topics"]))
 
 if __name__ == '__main__':
     main()

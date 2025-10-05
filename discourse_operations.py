@@ -4,10 +4,12 @@ import secrets
 import urllib.parse
 import uuid
 import webbrowser
+from curl_cffi import requests
 from collections.abc import Iterable
 from dataclasses import dataclass
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import padding, rsa
+from defs import TopicsResponse
 
 # From: https://github.com/discourse/discourse/blob/main/app/models/user_api_key_scope.rb
 ALL_SCOPES = [
@@ -39,7 +41,7 @@ class UserApiKeyRequestResult:
 # https://meta.discourse.org/t/user-api-keys-specification/48536
 # https://github.com/discourse/discourse/blob/main/app/controllers/user_api_keys_controller.rb
 def generate_user_api_key(
-    site_url_base: str,
+    base_url: str,
     application_name: str,
     client_id: str | None = None,
     scopes: Iterable[str] | None = None,
@@ -73,7 +75,7 @@ def generate_user_api_key(
         'nonce': nonce,
     }
     params_str = '&'.join(f'{k}={urllib.parse.quote(v)}' for k, v in params_dict.items())
-    webbrowser.open(f'{site_url_base}/user-api-key/new?{params_str}')
+    webbrowser.open(f'{base_url}/user-api-key/new?{params_str}')
  
     # Receive, decrypt and check response payload from server.
     enc_payload = input('Paste the response payload here: ')
@@ -89,3 +91,19 @@ def generate_user_api_key(
         client_id=client_id_to_use,
         payload=dec_payload,
     )
+
+def fetch_latest(base_url: str, payload: UserApiKeyPayload) -> TopicsResponse | None:
+    response = requests.get(
+        f"{base_url}/latest.json",
+        headers={
+            "User-Api-Key": payload.key,
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36",
+            "Referer": "https://www.google.com/",
+            "Accept-Language": "zh-CN,zh;q=0.9"
+        },
+    )
+    if response.status_code != 200:
+        print(f"Request failed with status code {response.status_code}")
+        return
+    new_topics = TopicsResponse(response.json())
+    return new_topics
