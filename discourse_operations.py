@@ -25,6 +25,13 @@ ALL_SCOPES = [
 ]
 DEFAULT_SCOPES = ['read']
 
+REQUEST_HEADERS = lambda key: {
+    "User-Api-Key": key,
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36",
+    "Referer": "https://www.google.com/",
+    "Accept-Language": "zh-CN,zh;q=0.9"
+}
+
 @dataclass
 class UserApiKeyPayload:
     key: str
@@ -95,15 +102,20 @@ def generate_user_api_key(
 def fetch_latest(base_url: str, payload: UserApiKeyPayload) -> TopicsResponse | None:
     response = requests.get(
         f"{base_url}/latest.json",
-        headers={
-            "User-Api-Key": payload.key,
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36",
-            "Referer": "https://www.google.com/",
-            "Accept-Language": "zh-CN,zh;q=0.9"
-        },
+        headers=REQUEST_HEADERS(payload.key),
     )
     if response.status_code != 200:
         print(f"Request failed with status code {response.status_code}")
         return
     new_topics = TopicsResponse(response.json())
     return new_topics
+
+def fetch_topic_content(base_url: str, payload: UserApiKeyPayload, topic_id: int) -> str | None:
+    response = requests.get(
+        f"{base_url}/t/{topic_id}.json",
+        headers=REQUEST_HEADERS(payload.key),
+    )
+    if response.status_code != 200:
+        print(f"Request failed with status code {response.status_code}")
+        return None
+    return response.json()['post_stream']['posts'][0]['cooked']

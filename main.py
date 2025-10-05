@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 from dataclasses import asdict
 from openai import AsyncOpenAI
 from defs import Topic
-from discourse_operations import DEFAULT_SCOPES, fetch_latest, generate_user_api_key
+from discourse_operations import DEFAULT_SCOPES, fetch_latest, fetch_topic_content, generate_user_api_key
 from utils import read_config
 
 load_dotenv()
@@ -15,20 +15,29 @@ SITE_URL = "https://linux.do"
 CLIENT_NAME = "auto-discourse"
 CLIENT_ID = "Tv3eZYxfvYo3VU6reYX20ogXgbUHhYpG"
 SITE_REQUEST_INTERVAL = 30
+VERBOSE = True
 
 USER_INSTERESTS = os.environ.get("USER_INSTERESTS")
 USER_UNINSTERESTS = os.environ.get("USER_UNINSTERESTS")
 
 SYSTEM_INSTRUCTION = f"""
-你是一个 AI 助手，你的任务是判断一个话题用户是否可能感兴趣。
-你可以使用以下关键词来辅助判断：
-- 用户感兴趣的关键词：{USER_INSTERESTS}
-- 用户不感兴趣的关键词：{USER_UNINSTERESTS}
+你是一个话题兴趣判断助手。请根据用户的关键词偏好，判断给定话题是否可能引起用户兴趣。
 
-请判断给定的话题用户是否感兴趣，并回答`true`或`false`。
+**用户偏好设置：**
+- 感兴趣关键词：{USER_INSTERESTS}
+- 不感兴趣关键词：{USER_UNINSTERESTS}
 
-**注意：你的回答只能是`true`或`false`，不要输出其他内容，也不要有任何解释。**
-"""
+**判断规则：**
+1. 如果话题标题包含任何"感兴趣关键词"，返回 true
+2. 如果话题标题包含任何"不感兴趣关键词"，返回 false  
+3. 如果两者都不包含，基于话题内容与兴趣关键词的相关性判断
+4. 优先考虑"感兴趣关键词"的匹配
+
+**输出要求：**
+- 只输出 `true` 或 `false`
+- 不要添加任何解释或额外内容
+- 严格遵循布尔值格式
+""".strip()
 
 client = AsyncOpenAI(
     api_key=os.environ.get("OPENAI_API_KEY"),
@@ -43,7 +52,7 @@ def print_topic(topic: Topic):
 链接：https://linux.do/t/topic/{topic['id']}
 """)
 
-async def check_is_insterested(topic: str) -> bool:
+async def check_is_insterested(topic: Topic) -> bool:
     RETRY_COUNT = 3
     i = 1
     while i <= RETRY_COUNT:
@@ -52,7 +61,10 @@ async def check_is_insterested(topic: str) -> bool:
                 model=os.environ.get("MODEL_ID") or "gpt-4",
                 messages=[
                     {"role": "system", "content": SYSTEM_INSTRUCTION},
-                    {"role": "user", "content": topic},
+                    {"role": "user", "content": f"""
+<title>{topic['title']}</title>
+<tags>{topic["tags"]}</tags>
+""".strip()},
                 ]
             )
             if completion.choices[0].message.content is not None:
@@ -66,13 +78,15 @@ async def check_topics(topics: list[Topic]):
     batch_size = int(os.environ.get("CHECK_IN_BATCH") or "5")
     for i in range(0, len(topics), batch_size):
         batch = topics[i:i+batch_size]
-        tasks = [check_is_insterested(topic['title']) for topic in batch]
+        tasks = [check_is_insterested(topic) for topic in batch]
         results = await asyncio.gather(*tasks)
 
         for _, (topic, is_insterested) in enumerate(zip(batch, results)):
+            if VERBOSE:
+                print(f"Topic: {topic['title']}, is_insterested: {is_insterested}")
             if is_insterested:
                 print_topic(topic)
-                topic_cache.add(topic['title'])
+            topic_cache.add(topic['title'])
 
 def main() -> None:
     try:
