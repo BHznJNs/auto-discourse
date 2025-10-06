@@ -64,6 +64,7 @@ async def check_is_insterested(payload: UserApiKeyPayload, topic: Topic) -> bool
     if topic_content is not None:
         topic_prompt += f"\n<content>{topic_content}</content>"
 
+    exception = None
     while i <= RETRY_COUNT:
         try:
             completion = await client.chat.completions.create(
@@ -75,9 +76,10 @@ async def check_is_insterested(payload: UserApiKeyPayload, topic: Topic) -> bool
             )
             if completion.choices[0].message.content is not None:
                 return completion.choices[0].message.content.strip() == "true"
-        except: pass
+        except Exception as e:
+            exception = e
         i += 1
-    print(f"Failed to check interest for topic: {topic}")
+    print(f"Failed to check interest for topic: {topic['title']}, {exception}")
     return False
 
 async def check_topics(payload: UserApiKeyPayload, topics: list[Topic]):
