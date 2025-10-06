@@ -112,10 +112,14 @@ def main() -> None:
 
     try:
         while True:
-            latest_topics = fetch_latest(SITE_URL, user_api_key_payload)
+            try:
+                latest_topics = fetch_latest(SITE_URL, user_api_key_payload)
+            except:
+                latest_topics = None
             if latest_topics is None:
                 time.sleep(3)
                 continue
+
             topics = latest_topics["topic_list"]["topics"]
             start_time = time.monotonic()
             try:
