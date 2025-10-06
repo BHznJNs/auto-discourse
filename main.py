@@ -118,10 +118,13 @@ def main() -> None:
                 continue
             topics = latest_topics["topic_list"]["topics"]
             start_time = time.monotonic()
-            asyncio.run(
-                check_topics(
-                    user_api_key_payload,
-                    list(filter(lambda topic: not topic_cache.has(topic['title']), topics))))
+            try:
+                asyncio.run(
+                    check_topics(
+                        user_api_key_payload,
+                        list(filter(lambda topic: not topic_cache.has(topic['title']), topics))))
+            except Exception as e:
+                print(f"Failed to check topics: {e}")
             end_time = time.monotonic()
             sleep_time = max(0, SITE_REQUEST_INTERVAL - (end_time - start_time))
             time.sleep(sleep_time)
