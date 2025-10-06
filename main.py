@@ -6,8 +6,8 @@ from dataclasses import asdict
 from openai import AsyncOpenAI
 from dotenv import load_dotenv
 from defs import Topic
-from discourse_operations import DEFAULT_SCOPES, fetch_latest, generate_user_api_key
-from utils import read_config
+from discourse_operations import DEFAULT_SCOPES, UserApiKeyPayload, fetch_latest, fetch_topic_content, generate_user_api_key
+from utils import read_user_key
 from cache import Cache
 
 load_dotenv()
@@ -53,19 +53,24 @@ def print_topic(topic: Topic):
 链接：https://linux.do/t/topic/{topic['id']}
 """)
 
-async def check_is_insterested(topic: Topic) -> bool:
+async def check_is_insterested(payload: UserApiKeyPayload, topic: Topic) -> bool:
     RETRY_COUNT = 3
     i = 1
+    topic_content = await asyncio.to_thread(fetch_topic_content, SITE_URL, payload, topic["id"])
+    topic_prompt = f"""
+<title>{topic['title']}</title>
+<tags>{topic["tags"]}</tags>
+""".strip()
+    if topic_content is not None:
+        topic_prompt += f"\n<content>{topic_content}</content>"
+
     while i <= RETRY_COUNT:
         try:
             completion = await client.chat.completions.create(
                 model=os.environ.get("MODEL_ID") or "gpt-4",
                 messages=[
                     {"role": "system", "content": SYSTEM_INSTRUCTION},
-                    {"role": "user", "content": f"""
-<title>{topic['title']}</title>
-<tags>{topic["tags"]}</tags>
-""".strip()},
+                    {"role": "user", "content": topic_prompt},
                 ]
             )
             if completion.choices[0].message.content is not None:
@@ -75,11 +80,11 @@ async def check_is_insterested(topic: Topic) -> bool:
     print(f"Failed to check interest for topic: {topic}")
     return False
 
-async def check_topics(topics: list[Topic]):
+async def check_topics(payload: UserApiKeyPayload, topics: list[Topic]):
     batch_size = int(os.environ.get("CHECK_IN_BATCH") or "5")
     for i in range(0, len(topics), batch_size):
         batch = topics[i:i+batch_size]
-        tasks = [check_is_insterested(topic) for topic in batch]
+        tasks = [check_is_insterested(payload, topic) for topic in batch]
         results = await asyncio.gather(*tasks)
 
         for _, (topic, is_insterested) in enumerate(zip(batch, results)):
@@ -91,7 +96,7 @@ async def check_topics(topics: list[Topic]):
 
 def main() -> None:
     try:
-        user_api_key_payload = read_config()
+        user_api_key_payload = read_user_key()
     except FileNotFoundError:
         result = generate_user_api_key(
             SITE_URL,
@@ -113,6 +118,7 @@ def main() -> None:
             start_time = time.monotonic()
             asyncio.run(
                 check_topics(
+                    user_api_key_payload,
                     list(filter(lambda topic: not topic_cache.has(topic['title']), topics))))
             end_time = time.monotonic()
             sleep_time = max(0, SITE_REQUEST_INTERVAL - (end_time - start_time))
