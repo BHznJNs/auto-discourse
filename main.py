@@ -2,12 +2,13 @@ import asyncio
 import json
 import os
 import time
-from dotenv import load_dotenv
 from dataclasses import asdict
 from openai import AsyncOpenAI
+from dotenv import load_dotenv
 from defs import Topic
 from discourse_operations import DEFAULT_SCOPES, fetch_latest, generate_user_api_key
 from utils import read_config
+from cache import Cache
 
 load_dotenv()
 
@@ -44,7 +45,7 @@ client = AsyncOpenAI(
     base_url=os.environ.get("OPENAI_BASE_URL"),
     default_headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"}
 )
-topic_cache = set()
+topic_cache = Cache()
 
 def print_topic(topic: Topic):
     print(f"""
@@ -98,23 +99,28 @@ def main() -> None:
             client_id=CLIENT_ID,
             scopes=DEFAULT_SCOPES,
         )
-        with open('config.json', 'w') as f:
+        with open('key.json', 'w') as f:
             json.dump(asdict(result.payload), f)
         user_api_key_payload = result.payload
 
-    while True:
-        latest_topics = fetch_latest(SITE_URL, user_api_key_payload)
-        if latest_topics is None:
-            time.sleep(3)
-            continue
-        topics = latest_topics["topic_list"]["topics"]
-        start_time = time.monotonic()
-        asyncio.run(
-            check_topics(
-                list(filter(lambda topic: topic['title'] not in topic_cache, topics))))
-        end_time = time.monotonic()
-        sleep_time = max(0, SITE_REQUEST_INTERVAL - (end_time - start_time))
-        time.sleep(sleep_time)
+    try:
+        while True:
+            latest_topics = fetch_latest(SITE_URL, user_api_key_payload)
+            if latest_topics is None:
+                time.sleep(3)
+                continue
+            topics = latest_topics["topic_list"]["topics"]
+            start_time = time.monotonic()
+            asyncio.run(
+                check_topics(
+                    list(filter(lambda topic: not topic_cache.has(topic['title']), topics))))
+            end_time = time.monotonic()
+            sleep_time = max(0, SITE_REQUEST_INTERVAL - (end_time - start_time))
+            time.sleep(sleep_time)
+    except KeyboardInterrupt:
+        print("Exiting...")
+    finally:
+        topic_cache.save()
 
 if __name__ == '__main__':
     main()

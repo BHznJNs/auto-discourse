@@ -1,0 +1,4 @@
+cachetools==6.2.0
+openai==2.1.0
+dotenv==0.9.9
+curl-cffi==0.13.0
